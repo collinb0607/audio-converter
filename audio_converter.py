@@ -7,8 +7,9 @@ optional loudness normalization.
 Requirements:
     Python 3.8+ (with Tkinter, included in the python.org installers)
     imageio-ffmpeg -> bundles an FFmpeg binary (no separate install needed)
-    The app offers to install it on first run. Manual install, using the Python that runs the app:
-        python -m pip install imageio-ffmpeg
+    tkinterdnd2    -> drag and drop (optional: the app works without it)
+    The app offers to install them on first run. Manual install, using the Python that runs the app:
+        python -m pip install imageio-ffmpeg tkinterdnd2
 
 Run:
     python audio_converter.py
@@ -121,7 +122,7 @@ def install_requirements():
     exe = sys.executable
     if exe.lower().endswith("pythonw.exe"):  # pythonw has no console; use python.exe for pip
         exe = exe[:-len("pythonw.exe")] + "python.exe"
-    r = subprocess.run([exe, "-m", "pip", "install", "--upgrade", "imageio-ffmpeg"],
+    r = subprocess.run([exe, "-m", "pip", "install", "--upgrade", "imageio-ffmpeg", "tkinterdnd2"],
                        capture_output=True, text=True, errors="replace", **_POPEN_FLAGS)
     add_user_site()
     return r.returncode == 0, (r.stderr or r.stdout).strip().splitlines()[-3:]
@@ -290,6 +291,8 @@ class ConverterApp:
         self._on_format()
         self._on_normalize()
         self._on_where()
+        self.dnd = enable_drag_and_drop(root, self._on_drop, self._on_drag_enter, self._update_list_label)
+        self._update_list_label()
 
         if self.ffmpeg:
             self.status.config(text=f"Ready — using {self.ffmpeg_desc}.")
@@ -329,7 +332,12 @@ class ConverterApp:
         self.ffmpeg, self.ffmpeg_desc = find_ffmpeg()
         if ok and self.ffmpeg:
             self.status.config(text=f"Installed! Using {self.ffmpeg_desc}.")
+            if not self.dnd:  # tkinterdnd2 was just installed too
+                self.dnd = enable_drag_and_drop(self.root, self._on_drop, self._on_drag_enter,
+                                                self._update_list_label)
+                self._update_list_label()
             for iid, item in self.items.items():  # re-read files added before FFmpeg existed
+                item["info"] = None
                 self._set_row(iid, status="Reading…")
                 self.probe_queue.put((iid, item["path"]))
         else:
@@ -338,7 +346,7 @@ class ConverterApp:
                 "Install failed",
                 "Couldn't install automatically:\n\n" + "\n".join(tail) +
                 "\n\nTry running this in a terminal:\n"
-                f'"{sys.executable}" -m pip install imageio-ffmpeg')
+                f'"{sys.executable}" -m pip install imageio-ffmpeg tkinterdnd2')
 
     # ---- layout --------------------------------------------------------- #
     def _build_ui(self):
@@ -489,13 +497,48 @@ class ConverterApp:
         d = filedialog.askdirectory(title="Choose a folder of videos or audio files")
         if not d:
             return
-        paths = sorted(os.path.join(d, n) for n in os.listdir(d)
-                       if os.path.splitext(n)[1].lower() in MEDIA_EXTS
-                       and os.path.isfile(os.path.join(d, n)))
+        paths = self._folder_media(d)
         if not paths:
             messagebox.showinfo("No files found", "That folder has no video or audio files directly "
                                 "inside it (subfolders aren't searched).")
         self._add_paths(paths)
+
+    def _folder_media(self, d):
+        return sorted(os.path.join(d, n) for n in os.listdir(d)
+                      if os.path.splitext(n)[1].lower() in MEDIA_EXTS
+                      and os.path.isfile(os.path.join(d, n)))
+
+    def _on_drag_enter(self):
+        if not self.running:
+            self.list_lbl.config(text="Drop to add these files.", foreground="")
+
+    def _on_drop(self, paths):
+        """Files or folders dropped on the window (a folder adds the files directly inside it)."""
+        self._update_list_label()
+        if self.running:
+            self.status.config(text="Wait for this batch to finish before adding more files.")
+            return
+        found, skipped, empty = [], 0, []
+        for p in paths:
+            if os.path.isdir(p):
+                media = self._folder_media(p)
+                found += media
+                if not media:
+                    empty.append(os.path.basename(p) or p)
+            elif os.path.splitext(p)[1].lower() in MEDIA_EXTS:
+                found.append(p)
+            else:
+                skipped += 1
+        self._add_paths(found)
+        notes = []
+        if skipped:
+            notes.append(f"{skipped} file{'s' * (skipped != 1)} skipped (not a video or audio file)")
+        if empty:
+            notes.append("no video or audio files directly inside " + ", ".join(empty) +
+                         " (subfolders aren't searched)")
+        if notes:
+            text = "; ".join(notes)
+            self.status.config(text=text[0].upper() + text[1:] + ".")
 
     def _add_paths(self, paths):
         known = {os.path.normcase(os.path.abspath(i["path"])) for i in self.items.values()}
@@ -557,8 +600,11 @@ class ConverterApp:
         ok = sum(1 for i in self.items.values() if i["info"] and not i["info"]["error"])
         total = sum(i["info"]["duration"] or 0 for i in self.items.values()
                     if i["info"] and not i["info"]["error"])
-        self.list_lbl.config(text=("Add files, or a folder (files directly inside it)." if not n else
-                                   f"{n} file{'s' * (n != 1)}, {ok} with sound, {fmt_time(total)} in total."))
+        empty = ("Drag files or folders here, or use Add files." if getattr(self, "dnd", False)
+                 else "Add files, or a folder (files directly inside it).")
+        self.list_lbl.config(text=empty if not n else
+                             f"{n} file{'s' * (n != 1)}, {ok} with sound, {fmt_time(total)} in total.",
+                             foreground="gray")
 
     # ---- output names --------------------------------------------------- #
     def _plan_outputs(self, todo):
@@ -801,6 +847,45 @@ class ConverterApp:
         self.root.destroy()
 
 
+def enable_drag_and_drop(root, on_drop, on_enter=None, on_leave=None):
+    """Accept files dragged onto the window, using tkinterdnd2 if it's installed.
+    Returns False when it isn't (or its native part can't load): the Browse
+    buttons still work, so drag and drop is optional.
+
+    on_drop gets the list of dropped paths. Every widget is registered, so a
+    drop works anywhere in the window.
+    """
+    try:
+        from tkinterdnd2 import DND_FILES, TkinterDnD
+        TkinterDnD.require(root)
+    except Exception:
+        return False
+
+    def drop(event):
+        # The paths come as a Tcl list: names with spaces are in {braces}.
+        on_drop(list(root.tk.splitlist(event.data)))
+        return event.action  # "copy": the files stay where they are
+
+    def hook(fn):
+        def handler(event):
+            if fn:
+                fn()
+            return event.action
+        return handler
+
+    widgets, todo = [], list(root.winfo_children())
+    while todo:
+        w = todo.pop()
+        widgets.append(w)
+        todo += w.winfo_children()
+    for w in widgets:
+        w.drop_target_register(DND_FILES)
+        w.dnd_bind("<<Drop>>", drop)
+        w.dnd_bind("<<DropEnter>>", hook(on_enter))
+        w.dnd_bind("<<DropLeave>>", hook(on_leave))
+    return True
+
+
 LOG_PATH = os.path.join(tempfile.gettempdir(), "audio_converter_errors.log")
 
 
@@ -827,7 +912,26 @@ def reveal_file(path):
         pass
 
 
+def self_test():
+    """Used by the release build: exit code 0 if FFmpeg and drag and drop both
+    work in the packaged app, so a missing piece fails the build."""
+    if not find_ffmpeg()[0]:
+        return 1
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        from tkinterdnd2 import TkinterDnD
+        TkinterDnD.require(root)
+        root.destroy()
+    except Exception as e:
+        log_error(f"Self-test failed: {type(e).__name__}: {e}")
+        return 2
+    return 0
+
+
 def main():
+    if "--self-test" in sys.argv:
+        sys.exit(self_test())
     root = tk.Tk()
     try:  # nicer native look where available
         ttk.Style().theme_use("vista" if sys.platform == "win32" else

@@ -20,7 +20,8 @@ Nothing else to install: FFmpeg is built in.
 On an Intel Mac, or any other system, run it from source with Python (below).
 
 ## How it works
-- **Batches.** Add files or a whole folder (the files directly inside it). Each file shows its
+- **Batches, with drag and drop.** Drag files or folders onto the window, or use **Add files** /
+  **Add folder** (a folder adds the files directly inside it). Each file shows its
   length, sound format and progress. Files with no sound, or damaged files, are skipped with the
   reason, and the rest carry on.
 - **Equal loudness, not just "louder".** Normalizing measures how loud each file *sounds* (in LUFS,
@@ -48,7 +49,8 @@ On an Intel Mac, or any other system, run it from source with Python (below).
 ### Setup (one time)
 1. Install **Python 3.8+** from https://python.org. On Windows, tick **"Add Python to PATH"** during install.
 2. Run the app (see below). The first time, it asks **"Install FFmpeg?"** Click **Yes**. It downloads
-   `imageio-ffmpeg`, which includes FFmpeg (about 30 MB). You won't be asked again.
+   `imageio-ffmpeg`, which includes FFmpeg (about 30 MB), and `tkinterdnd2` for drag and drop.
+   You won't be asked again.
 
 ### Run
 ```
