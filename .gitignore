@@ -1,0 +1,19 @@
+# Files made by the app, and test files
+*.gif
+*.webp
+*.mp4
+*.webm
+!docs/*.gif
+
+# PyInstaller output
+build/
+dist/
+*.spec
+
+__pycache__/
+*.pyc
+*.mp3
+*.wav
+*.m4a
+*.flac
+*.part
