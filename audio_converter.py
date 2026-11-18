@@ -787,7 +787,7 @@ class ConverterApp:
         first_out = None
         for k, (iid, src, info, out) in enumerate(jobs):
             if self.cancelled:
-                self.ui(lambda i=iid: self._set_row(i, status="Cancelled"))
+                self.ui(lambda i=iid: self._set_row(i, status="Canceled"))
                 results["cancelled"] += 1
                 continue
             name = os.path.basename(src)
@@ -804,7 +804,7 @@ class ConverterApp:
             try:
                 note = self._convert_one(src, info, out, s, on_progress)
             except Cancelled:
-                self.ui(lambda i=iid: self._set_row(i, status="Cancelled"))
+                self.ui(lambda i=iid: self._set_row(i, status="Canceled"))
                 results["cancelled"] += 1
                 continue
             except EncodeError as e:
@@ -833,7 +833,7 @@ class ConverterApp:
         if r["failed"]:
             parts.append(f"{r['failed']} failed — see the list")
         if r["cancelled"]:
-            parts.append(f"{r['cancelled']} cancelled")
+            parts.append(f"{r['cancelled']} canceled")
         self.status.config(text=("Done! " if not (r["failed"] or r["cancelled"]) else "") +
                            ", ".join(parts) + ".")
         if first_out and self.v["reveal"].get() and not self.cancelled:
@@ -949,7 +949,7 @@ def support_link(parent, bg=None, font=None):
 
 # --------------------------------------------------------------------------- #
 #  The look (shared by the Offline Toolkit apps): white cards, a dark purple
-#  header fading to blue, blue actions. Only colours and fonts: no behaviour.
+#  header fading to blue, blue actions. Only colors and fonts: no behavior.
 # --------------------------------------------------------------------------- #
 THEME = dict(
     bg="#ffffff", card="#ffffff", border="#e2ddf0", text="#1c1433", muted="#6e6787", error="#c8364f",
@@ -990,7 +990,7 @@ def _indicator_image(root, kind, on, enabled, n=18, k=4):
         return (x - cx) ** 2 + (y - cy) ** 2 <= r * r
 
     def colour_at(x, y):
-        """The colour of one sample point, or None where it's see-through."""
+        """The color of one sample point, or None where it's see-through."""
         c = n / 2
         d = ((x - c) ** 2 + (y - c) ** 2) ** 0.5
         if kind == "check":
@@ -1034,7 +1034,7 @@ def _indicator_image(root, kind, on, enabled, n=18, k=4):
 
 
 def apply_theme(root):
-    """ttk's "clam" theme, recoloured (the native Windows and macOS themes ignore colours)."""
+    """ttk's "clam" theme, recoloured (the native Windows and macOS themes ignore colors)."""
     import tkinter.font as tkfont
     t, fam = THEME, ui_family()
     root.configure(bg=t["bg"])
@@ -1049,7 +1049,7 @@ def apply_theme(root):
     s.configure(".", background=t["bg"], foreground=t["text"], font=(fam, 10), bordercolor=t["border"],
                 focuscolor=t["blue"], lightcolor=t["card"], darkcolor=t["border"], troughcolor="#ece8f7")
     s.map(".", foreground=[("disabled", t["disabled"])])
-    s.map("TLabel", background=[("disabled", t["card"])])  # clam greys a disabled label's background
+    s.map("TLabel", background=[("disabled", t["card"])])  # clam grays a disabled label's background
     s.configure("TLabelframe", background=t["card"], bordercolor=t["border"], lightcolor=t["border"],
                 darkcolor=t["border"], relief="solid", borderwidth=1)
     s.configure("TLabelframe.Label", background=t["card"], foreground=t["purple2"], font=(fam, 11, "bold"))
