@@ -17,3 +17,4 @@ __pycache__/
 *.m4a
 *.flac
 *.part
+!assets/icon.png
